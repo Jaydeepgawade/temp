@@ -108,11 +108,183 @@ For REJECT:
 - Move request back to that step.
 - If business requirements later need configurable reject targets, design this to be extendable.
 
+MANDATORY GENERIC QUERY DEVELOPMENT:
+Do not only describe the query concept. Actually design and implement the generic SQL queries/stored-procedure sections required by this workflow.
+These queries are new workflow infrastructure and may need to be developed separately before integrating them into the existing stored procedure.
+Do not assume the existing stored procedure already provides these values.
+First inspect the current database schema and current SP, then add the minimum new query logic necessary.
+
+The generic query flow must explicitly include where every parameter/value comes from.
+
+The UI/API should preferably send only:
+- RequestId
+- Action
+- Remarks if required
+
+The following values must NOT be trusted from the browser:
+- WorkflowId
+- WorkflowVersion
+- CurrentStepOrder
+- CurrentRoleId
+- NextStepOrder
+- NextRoleId
+- Status
+
+The stored procedure/service must obtain authoritative workflow values from the database.
+
+Step A - Fetch current workflow context using RequestId:
+
+SELECT
+    @WorkflowId = WorkflowId,
+    @WorkflowVersion = WorkflowVersion,
+    @CurrentStepOrder = CurrentStepOrder,
+    @CurrentRoleId = CurrentRoleId,
+    @VerticalId = VerticalId
+FROM RequestWorkflow
+WHERE RequestId = @RequestId;
+
+Parameter/value source explanation:
+- @RequestId comes from the selected business record/API request.
+- @Action comes from Approve/Reject action requested by the user.
+- @WorkflowId comes from RequestWorkflow using @RequestId.
+- @WorkflowVersion comes from RequestWorkflow using @RequestId.
+- @CurrentStepOrder comes from RequestWorkflow using @RequestId.
+- @CurrentRoleId comes from RequestWorkflow using @RequestId.
+- @VerticalId comes from RequestWorkflow using @RequestId.
+- @NextStepOrder and @NextRoleId are OUTPUT values discovered from WorkflowStep configuration; they are not inputs from UI.
+
+Step B - Generic APPROVE next-step query:
+
+SELECT TOP 1
+    @NextStepOrder = StepOrder,
+    @NextRoleId = RoleId
+FROM WorkflowStep
+WHERE WorkflowId = @WorkflowId
+  AND StepOrder > @CurrentStepOrder
+  AND IsActive = 1
+ORDER BY StepOrder ASC;
+
+If @NextStepOrder is NULL:
+- The current step is the final configured step.
+- Mark the request COMPLETED.
+
+If @NextStepOrder is not NULL:
+- Update RequestWorkflow.CurrentStepOrder = @NextStepOrder.
+- Update RequestWorkflow.CurrentRoleId = @NextRoleId.
+- Keep Status = PENDING.
+
+Step C - Generic REJECT previous-step query:
+
+SELECT TOP 1
+    @PreviousStepOrder = StepOrder,
+    @PreviousRoleId = RoleId
+FROM WorkflowStep
+WHERE WorkflowId = @WorkflowId
+  AND StepOrder < @CurrentStepOrder
+  AND IsActive = 1
+ORDER BY StepOrder DESC;
+
+Do not hardcode statements such as:
+- If Verifier then go to Manager.
+- If Manager rejects then go to Auditor.
+- If HR approves then complete.
+The workflow table and StepOrder must determine this dynamically.
+
+Step D - New request workflow binding query:
+For a NEW request, first determine VerticalId, then fetch the currently active workflow version for that vertical:
+
+SELECT TOP 1
+    @WorkflowId = WorkflowId,
+    @WorkflowVersion = VersionNo
+FROM WorkflowMaster
+WHERE VerticalId = @VerticalId
+  AND IsActive = 1
+ORDER BY VersionNo DESC;
+
+Then fetch the first active step:
+
+SELECT TOP 1
+    @CurrentStepOrder = StepOrder,
+    @CurrentRoleId = RoleId
+FROM WorkflowStep
+WHERE WorkflowId = @WorkflowId
+  AND IsActive = 1
+ORDER BY StepOrder ASC;
+
+Then insert RequestWorkflow with:
+- RequestId
+- VerticalId
+- WorkflowId
+- WorkflowVersion
+- CurrentStepOrder
+- CurrentRoleId
+- Status = PENDING
+
+Step E - Role removal safety query:
+Before destructive removal from a workflow already in use, check pending requests:
+
+SELECT COUNT(*) AS PendingCount
+FROM RequestWorkflow
+WHERE WorkflowId = @WorkflowId
+  AND CurrentRoleId = @RoleId
+  AND Status = 'PENDING';
+
+Preferred versioned behavior:
+- Do not modify/delete old published workflow steps used by existing requests.
+- Publish a new workflow version without the removed role.
+- Existing requests continue the old version.
+- New requests use the new version.
+
+Step F - Workflow versioning query logic:
+Get current active version for the selected vertical.
+Calculate NewVersion = CurrentVersion + 1.
+Insert a NEW WorkflowMaster row.
+Insert the new ordered WorkflowStep rows against the new WorkflowId.
+Only after the new version is fully created, mark the old version inactive for NEW requests.
+Keep old WorkflowMaster/WorkflowStep rows available for in-progress requests and audit history.
+
+Very important meaning of IsActive on WorkflowMaster:
+IsActive = 0 means do not assign this version to new requests.
+It does NOT mean existing requests using this WorkflowId must stop working.
+
+Example:
+Workflow V1:
+Verifier -> Accountant -> HR
+
+Request 1001 starts on V1 and stores WorkflowId 101.
+
+Admin changes flow and publishes V2:
+Verifier -> Manager -> Auditor -> HR
+
+Request 2001 starts on V2 and stores WorkflowId 102.
+
+Expected behavior:
+- Request 1001 continues WorkflowId 101 / V1.
+- Request 2001 follows WorkflowId 102 / V2.
+- Never overwrite V1 just because V2 is published.
+
+For every generic query you develop, clearly document:
+1. Why the query is required.
+2. Which table it reads/writes.
+3. Where each parameter comes from.
+4. Which values are input from API.
+5. Which values are fetched from DB.
+6. Which values are calculated by the query.
+7. What happens when the query returns no row.
+8. How it interacts with the existing stored procedure.
+9. Whether the existing SP section remains unchanged, is wrapped, or is replaced.
+10. How to test the query independently before integrating it.
+
+Do NOT blindly inject the new SQL into the existing SP.
+First create/review the generic query logic separately, validate it with sample workflow data, and then merge only the workflow-decision portion into the existing SP with minimum changes.
+Preserve existing business-table update logic unless it conflicts with the new design.
+
 Role removal rules:
 - Never physically delete a role used by workflow history.
-- Use IsActive / soft-delete.
+- Use IsActive / soft-delete where appropriate.
 - Before removing a role from an active workflow, check whether pending requests are currently assigned to that role.
-- If pending records exist, block removal initially and return a clear message.
+- If pending records exist, block destructive removal initially and return a clear message.
+- Prefer publishing a new workflow version without that role.
 - Future enhancement can allow controlled migration to another step.
 
 Workflow versioning is mandatory:
@@ -120,25 +292,6 @@ Workflow versioning is mandatory:
 - New workflow changes must create a new version.
 - Old workflow versions must remain available for historical/in-progress requests.
 - New requests should use only the latest active version.
-
-Example:
-
-Workflow V1:
-Verifier -> Accountant -> HR
-
-Existing request:
-Request 1001 -> Workflow V1
-
-Admin changes flow.
-
-Workflow V2:
-Verifier -> Manager -> Auditor -> HR
-
-New request:
-Request 2001 -> Workflow V2
-
-Request 1001 must continue V1.
-Request 2001 must follow V2.
 
 Admin-only access:
 - Workflow configuration page must be visible only to Admin.
@@ -163,6 +316,8 @@ Stored procedure refactoring:
 - Refactor only the workflow decision-making part.
 - Remove hardcoded role-specific CASE conditions and static status mapping.
 - Replace them with generic WorkflowId + CurrentStepOrder + NextStep lookup.
+- Develop and test the generic queries independently before merging them into the current SP.
+- Show the exact old SP section that should be replaced and the exact new generic section that replaces it.
 
 Security:
 - Do not trust RoleId, WorkflowId, CurrentStepOrder, or status sent by the browser.
@@ -171,7 +326,7 @@ Security:
 - Validate that the current authenticated user actually has permission for the current role/vertical before processing Approve/Reject.
 
 Audit:
-Maintain audit/history such as:
+Maintain approval history such as:
 - RequestId
 - WorkflowId
 - WorkflowVersion
@@ -216,29 +371,36 @@ Important constraints:
 - Explain what currently happens and identify hardcoded workflow dependencies.
 - Do not directly replace large files without explaining the impact.
 - Prefer incremental implementation.
+- New generic workflow queries are allowed and expected where the current system does not have equivalent logic.
+- 'Minimum changes' does NOT mean avoiding necessary new tables/queries; it means isolate the new workflow engine and avoid unnecessary changes to unrelated existing code.
 
 Implementation order:
-1. Review existing UI, API/controller/service, and stored procedure.
-2. Identify all hardcoded role and status dependencies.
-3. Propose database migration.
-4. Create WorkflowMaster and WorkflowStep.
-5. Map current 9 vertical flows into configuration data.
-6. Add RequestWorkflow state tracking.
-7. Refactor SP workflow logic.
-8. Update .NET service/API.
-9. Remove frontend role-number switch mappings.
-10. Add Admin-only workflow configuration.
-11. Add workflow versioning.
-12. Add audit history.
-13. Test existing flows.
-14. Test dynamic role add/remove/reorder scenarios.
+1. Review existing UI, API/controller/service, stored procedure, and relevant tables.
+2. Identify all hardcoded role/status dependencies.
+3. Identify where RequestId, VerticalId, RoleId, and current status currently come from.
+4. Design the generic workflow SQL queries separately.
+5. For each query, document parameter/value sources.
+6. Create WorkflowMaster and WorkflowStep.
+7. Add RequestWorkflow state tracking.
+8. Seed/map the current 9 vertical flows into configuration data.
+9. Test generic next-step and previous-step queries independently using sample data.
+10. Add workflow versioning queries and test V1/V2 behavior.
+11. Refactor only the workflow-decision part of the existing SP.
+12. Keep stable existing business update logic wherever possible.
+13. Update .NET service/API.
+14. Remove frontend role-number switch mappings.
+15. Add Admin-only workflow configuration.
+16. Add audit history.
+17. Test existing flows.
+18. Test dynamic role add/remove/reorder scenarios.
+19. Perform regression testing before removing old hardcoded code completely.
 
 Required test scenarios:
 - Vertical with 2 roles
 - Vertical with 3 roles
 - Vertical with 5 roles
 - Add a new role in the middle
-- Remove an unused role
+- Remove an unused role through a new workflow version
 - Attempt to remove a role having pending requests
 - Reorder workflow
 - Approve through all steps
@@ -246,6 +408,8 @@ Required test scenarios:
 - Complete on last step
 - Existing request continues old workflow version
 - New request follows new version
+- Verify query parameters are loaded from RequestWorkflow, not browser payload
+- Verify NextRoleId is calculated from WorkflowStep, not client input
 - Unauthorized user cannot open workflow configuration
 - Unauthorized API request returns 403
 - Browser-modified RoleId must not bypass authorization
@@ -254,6 +418,7 @@ Very important:
 Do not implement role flow using role names.
 Do not implement sequence using status numbers.
 Do not hardcode the number of steps.
+Do not ask the browser to supply workflow state that can be fetched from the DB.
 The same generic engine must work whether a vertical has 2, 3, 5, 9, or more roles.
 
 When you respond:
@@ -261,8 +426,12 @@ When you respond:
 2. Show the proposed architecture.
 3. List exact files/SPs/tables that need changes.
 4. Explain what will remain unchanged.
-5. Give the DB migration first.
-6. Then implement one layer at a time.
-7. After every major change, explain how I should test it.
-8. If something in my current project conflicts with this design, do not guess—show the conflict and propose the safest solution.
+5. Identify all new generic SQL queries that must be developed.
+6. For every query, show where every parameter/value comes from.
+7. Give the DB migration first.
+8. Build and test generic queries separately before SP integration.
+9. Then implement one layer at a time.
+10. Show the exact SP section to refactor rather than rewriting the entire SP.
+11. After every major change, explain how I should test it.
+12. If something in my current project conflicts with this design, do not guess—show the conflict and propose the safest solution.
 ```
