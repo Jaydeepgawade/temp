@@ -1,132 +1,147 @@
-# 10 - Graph Basics, BFS and DFS
+# 16 - Greedy Algorithm Basics
 
-## Preserved code from the original lesson
+## What is a Greedy Algorithm?
+A Greedy Algorithm chooses the **best option available right now** at every step.
+
+It does not usually go back and change the previous decision.
+
+Simple idea:
+```text
+Choose the best local option -> move forward -> repeat
+```
+
+## Where Greedy is useful
+Common examples:
+- Activity Selection
+- Coin Change for some coin systems
+- Minimum/Maximum selection problems
+- Kruskal's Algorithm
+- Prim's Algorithm
+- Huffman Coding
+
+## Beginner Example - Activity Selection
+Suppose we have activities with start and end times.
+We want to select the maximum number of non-overlapping activities.
 
 ```text
-A ---- B
-|      |
-|      |
-C ---- D
+Activity  Start  End
+A1        1      2
+A2        3      4
+A3        0      6
+A4        5      7
+A5        8      9
+A6        5      9
 ```
+
+Greedy idea:
+Choose the activity that finishes earliest.
+
+## C# Example
 ```csharp
 using System;
 using System.Collections.Generic;
+using System.Linq;
+
+class Activity
+{
+    public string Name { get; set; }
+    public int Start { get; set; }
+    public int End { get; set; }
+}
 
 class Program
 {
     static void Main()
     {
-        Dictionary<int, List<int>> graph = new Dictionary<int, List<int>>
+        List<Activity> activities = new List<Activity>
         {
-            { 1, new List<int> { 2, 3 } },
-            { 2, new List<int> { 1, 4 } },
-            { 3, new List<int> { 1, 4 } },
-            { 4, new List<int> { 2, 3 } }
+            new Activity { Name = "A1", Start = 1, End = 2 },
+            new Activity { Name = "A2", Start = 3, End = 4 },
+            new Activity { Name = "A3", Start = 0, End = 6 },
+            new Activity { Name = "A4", Start = 5, End = 7 },
+            new Activity { Name = "A5", Start = 8, End = 9 },
+            new Activity { Name = "A6", Start = 5, End = 9 }
         };
 
-        foreach (var node in graph)
+        activities = activities.OrderBy(x => x.End).ToList();
+
+        int lastEndTime = -1;
+
+        foreach (Activity activity in activities)
         {
-            Console.Write(node.Key + " -> ");
-            foreach (int neighbour in node.Value)
+            if (activity.Start >= lastEndTime)
             {
-                Console.Write(neighbour + " ");
+                Console.WriteLine(activity.Name);
+                lastEndTime = activity.End;
             }
-            Console.WriteLine();
         }
     }
 }
 ```
+
+## Coin Change Basic Example
+Suppose coins are:
+```text
+10, 5, 2, 1
+```
+Amount:
+```text
+18
+```
+
+Greedy choice:
+```text
+10 + 5 + 2 + 1 = 18
+```
+
+## C# Code
 ```csharp
 using System;
-using System.Collections.Generic;
 
 class Program
 {
-    static void BFS(Dictionary<int, List<int>> graph, int start)
+    static void Main()
     {
-        Queue<int> queue = new Queue<int>();
-        HashSet<int> visited = new HashSet<int>();
+        int amount = 18;
+        int[] coins = { 10, 5, 2, 1 };
 
-        queue.Enqueue(start);
-        visited.Add(start);
-
-        while (queue.Count > 0)
+        foreach (int coin in coins)
         {
-            int current = queue.Dequeue();
-            Console.Write(current + " ");
-
-            foreach (int neighbour in graph[current])
+            while (amount >= coin)
             {
-                if (!visited.Contains(neighbour))
-                {
-                    visited.Add(neighbour);
-                    queue.Enqueue(neighbour);
-                }
+                Console.Write(coin + " ");
+                amount = amount - coin;
             }
         }
     }
-
-    static void Main()
-    {
-        Dictionary<int, List<int>> graph = new Dictionary<int, List<int>>
-        {
-            { 1, new List<int> { 2, 3 } },
-            { 2, new List<int> { 1, 4 } },
-            { 3, new List<int> { 1, 4 } },
-            { 4, new List<int> { 2, 3 } }
-        };
-
-        BFS(graph, 1);
-    }
 }
 ```
+
+Output:
 ```text
-1 2 3 4
+10 5 2 1
 ```
-```csharp
-using System;
-using System.Collections.Generic;
 
-class Program
-{
-    static void DFS(Dictionary<int, List<int>> graph, int current, HashSet<int> visited)
-    {
-        visited.Add(current);
-        Console.Write(current + " ");
+## Important Note
+Greedy does **not** give the correct answer for every problem.
+It works only when the problem has a valid greedy property.
 
-        foreach (int neighbour in graph[current])
-        {
-            if (!visited.Contains(neighbour))
-            {
-                DFS(graph, neighbour, visited);
-            }
-        }
-    }
+## Time Complexity
+It depends on the problem.
+For Activity Selection, sorting usually takes:
+- Time Complexity: **O(n log n)**
 
-    static void Main()
-    {
-        Dictionary<int, List<int>> graph = new Dictionary<int, List<int>>
-        {
-            { 1, new List<int> { 2, 3 } },
-            { 2, new List<int> { 1, 4 } },
-            { 3, new List<int> { 1, 4 } },
-            { 4, new List<int> { 2, 3 } }
-        };
-
-        HashSet<int> visited = new HashSet<int>();
-        DFS(graph, 1, visited);
-    }
-}
-```
-```text
-1 2 4 3
-```
+## Practice
+1. Select maximum non-overlapping activities.
+2. Solve coin change using greedy.
+3. Find minimum number of notes for an amount.
+4. Find maximum value by repeatedly choosing the largest available value.
 
 # Detailed English Workbook
 
 ## Learning contract
 
-This workbook develops a complete understanding of **Graph Traversal**.
+This workbook develops a complete understanding of **Greedy Algorithms**.
 It keeps the earlier lesson and code available above.
 The added material uses English only.
 Every solved problem includes a requirement, reasoning, C# solution, and dry run.
@@ -135,7 +150,7 @@ On revision days, start with the problems and return to theory when necessary.
 
 ## Mental model
 
-The central idea is to represent connections with an adjacency list and use a visited set to prevent repeated processing.
+The central idea is to make the best valid local choice, record it, and continue without undoing earlier choices.
 An algorithm is a precise sequence of finite steps.
 Each variable must have one clear responsibility.
 The input is the value supplied by the caller.
@@ -161,20 +176,18 @@ Keeping these roles separate makes debugging much easier.
 ## Reference implementation
 
 ```csharp
-static List<int> Bfs(Dictionary<int, List<int>> graph, int start)
+static int SelectActivities(List<(int Start, int End)> activities)
 {
-    var order = new List<int>();
-    var queue = new Queue<int>();
-    var visited = new HashSet<int> { start };
-    queue.Enqueue(start);
-    while (queue.Count > 0)
+    activities.Sort((a, b) => a.End.CompareTo(b.End));
+    int count = 0;
+    int lastEnd = int.MinValue;
+    foreach (var activity in activities)
     {
-        int node = queue.Dequeue();
-        order.Add(node);
-        foreach (int next in graph.GetValueOrDefault(node, new List<int>()))
-            if (visited.Add(next)) queue.Enqueue(next);
+        if (activity.Start < lastEnd) continue;
+        count++;
+        lastEnd = activity.End;
     }
-    return order;
+    return count;
 }
 ```
 
@@ -191,7 +204,7 @@ static List<int> Bfs(Dictionary<int, List<int>> graph, int start)
 - This separation lets a console app, API, or test call the same logic.
 - The implementation favors readability before micro-optimization.
 
-## Solved Problem 1: Graph Traversal case 1
+## Solved Problem 1: Greedy Algorithms case 1
 
 ### Requirement
 
@@ -203,7 +216,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `1`.
-2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
+2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -243,7 +256,7 @@ Console.WriteLine("Case 1 input: 1");
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 2: Graph Traversal case 2
+## Solved Problem 2: Greedy Algorithms case 2
 
 ### Requirement
 
@@ -255,7 +268,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `2`.
-2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
+2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -295,7 +308,7 @@ Console.WriteLine("Case 2 input: 2");
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 3: Graph Traversal case 3
+## Solved Problem 3: Greedy Algorithms case 3
 
 ### Requirement
 
@@ -307,7 +320,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `3`.
-2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
+2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -347,7 +360,7 @@ Console.WriteLine("Case 3 input: 3");
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 4: Graph Traversal case 4
+## Solved Problem 4: Greedy Algorithms case 4
 
 ### Requirement
 
@@ -359,7 +372,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `4`.
-2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
+2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -399,7 +412,7 @@ Console.WriteLine("Case 4 input: 4");
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 5: Graph Traversal case 5
+## Solved Problem 5: Greedy Algorithms case 5
 
 ### Requirement
 
@@ -411,7 +424,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `5`.
-2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
+2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.

@@ -1,16 +1,12 @@
-# 12 - Dynamic Programming Basics
+# 15 - Graph Basics, BFS and DFS
 
 ## Preserved code from the original lesson
 
 ```text
-Calculate once -> store the result -> reuse it
-```
-```text
-fib(5)
- -> fib(4)
- -> fib(3)
- -> fib(3)
- -> fib(2)
+A ---- B
+|      |
+|      |
+C ---- D
 ```
 ```csharp
 using System;
@@ -18,111 +14,119 @@ using System.Collections.Generic;
 
 class Program
 {
-    static Dictionary<int, int> memo = new Dictionary<int, int>();
-
-    static int Fibonacci(int n)
-    {
-        if (n <= 1)
-        {
-            return n;
-        }
-
-        if (memo.ContainsKey(n))
-        {
-            return memo[n];
-        }
-
-        int result = Fibonacci(n - 1) + Fibonacci(n - 2);
-        memo[n] = result;
-
-        return result;
-    }
-
     static void Main()
     {
-        Console.WriteLine(Fibonacci(6));
+        Dictionary<int, List<int>> graph = new Dictionary<int, List<int>>
+        {
+            { 1, new List<int> { 2, 3 } },
+            { 2, new List<int> { 1, 4 } },
+            { 3, new List<int> { 1, 4 } },
+            { 4, new List<int> { 2, 3 } }
+        };
+
+        foreach (var node in graph)
+        {
+            Console.Write(node.Key + " -> ");
+            foreach (int neighbour in node.Value)
+            {
+                Console.Write(neighbour + " ");
+            }
+            Console.WriteLine();
+        }
     }
 }
-```
-```text
-8
 ```
 ```csharp
 using System;
+using System.Collections.Generic;
 
 class Program
 {
-    static int Fibonacci(int n)
+    static void BFS(Dictionary<int, List<int>> graph, int start)
     {
-        if (n <= 1)
+        Queue<int> queue = new Queue<int>();
+        HashSet<int> visited = new HashSet<int>();
+
+        queue.Enqueue(start);
+        visited.Add(start);
+
+        while (queue.Count > 0)
         {
-            return n;
+            int current = queue.Dequeue();
+            Console.Write(current + " ");
+
+            foreach (int neighbour in graph[current])
+            {
+                if (!visited.Contains(neighbour))
+                {
+                    visited.Add(neighbour);
+                    queue.Enqueue(neighbour);
+                }
+            }
         }
-
-        int[] dp = new int[n + 1];
-        dp[0] = 0;
-        dp[1] = 1;
-
-        for (int i = 2; i <= n; i++)
-        {
-            dp[i] = dp[i - 1] + dp[i - 2];
-        }
-
-        return dp[n];
     }
 
     static void Main()
     {
-        Console.WriteLine(Fibonacci(6));
+        Dictionary<int, List<int>> graph = new Dictionary<int, List<int>>
+        {
+            { 1, new List<int> { 2, 3 } },
+            { 2, new List<int> { 1, 4 } },
+            { 3, new List<int> { 1, 4 } },
+            { 4, new List<int> { 2, 3 } }
+        };
+
+        BFS(graph, 1);
     }
 }
 ```
 ```text
-Index : 0 1 2 3 4 5 6
-Value : 0 1 1 2 3 5 8
-```
-```text
-ways[n] = ways[n - 1] + ways[n - 2]
+1 2 3 4
 ```
 ```csharp
 using System;
+using System.Collections.Generic;
 
 class Program
 {
-    static int ClimbStairs(int n)
+    static void DFS(Dictionary<int, List<int>> graph, int current, HashSet<int> visited)
     {
-        if (n <= 2)
+        visited.Add(current);
+        Console.Write(current + " ");
+
+        foreach (int neighbour in graph[current])
         {
-            return n;
+            if (!visited.Contains(neighbour))
+            {
+                DFS(graph, neighbour, visited);
+            }
         }
-
-        int[] dp = new int[n + 1];
-        dp[1] = 1;
-        dp[2] = 2;
-
-        for (int i = 3; i <= n; i++)
-        {
-            dp[i] = dp[i - 1] + dp[i - 2];
-        }
-
-        return dp[n];
     }
 
     static void Main()
     {
-        Console.WriteLine(ClimbStairs(5));
+        Dictionary<int, List<int>> graph = new Dictionary<int, List<int>>
+        {
+            { 1, new List<int> { 2, 3 } },
+            { 2, new List<int> { 1, 4 } },
+            { 3, new List<int> { 1, 4 } },
+            { 4, new List<int> { 2, 3 } }
+        };
+
+        HashSet<int> visited = new HashSet<int>();
+        DFS(graph, 1, visited);
     }
 }
 ```
 ```text
-8
+1 2 4 3
 ```
 
 # Detailed English Workbook
 
 ## Learning contract
 
-This workbook develops a complete understanding of **Dynamic Programming**.
+This workbook develops a complete understanding of **Graph Traversal**.
 It keeps the earlier lesson and code available above.
 The added material uses English only.
 Every solved problem includes a requirement, reasoning, C# solution, and dry run.
@@ -131,7 +135,7 @@ On revision days, start with the problems and return to theory when necessary.
 
 ## Mental model
 
-The central idea is to define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
+The central idea is to represent connections with an adjacency list and use a visited set to prevent repeated processing.
 An algorithm is a precise sequence of finite steps.
 Each variable must have one clear responsibility.
 The input is the value supplied by the caller.
@@ -157,16 +161,20 @@ Keeping these roles separate makes debugging much easier.
 ## Reference implementation
 
 ```csharp
-static int MinStepsToOne(int number)
+static List<int> Bfs(Dictionary<int, List<int>> graph, int start)
 {
-    int[] dp = new int[number + 1];
-    for (int value = 2; value <= number; value++)
+    var order = new List<int>();
+    var queue = new Queue<int>();
+    var visited = new HashSet<int> { start };
+    queue.Enqueue(start);
+    while (queue.Count > 0)
     {
-        dp[value] = dp[value - 1] + 1;
-        if (value % 2 == 0) dp[value] = Math.Min(dp[value], dp[value / 2] + 1);
-        if (value % 3 == 0) dp[value] = Math.Min(dp[value], dp[value / 3] + 1);
+        int node = queue.Dequeue();
+        order.Add(node);
+        foreach (int next in graph.GetValueOrDefault(node, new List<int>()))
+            if (visited.Add(next)) queue.Enqueue(next);
     }
-    return dp[number];
+    return order;
 }
 ```
 
@@ -183,7 +191,7 @@ static int MinStepsToOne(int number)
 - This separation lets a console app, API, or test call the same logic.
 - The implementation favors readability before micro-optimization.
 
-## Solved Problem 1: Dynamic Programming case 1
+## Solved Problem 1: Graph Traversal case 1
 
 ### Requirement
 
@@ -195,7 +203,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `1`.
-2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
+2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -205,7 +213,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine(MinStepsToOne(1));
+Console.WriteLine("Case 1 input: 1");
 ```
 
 ### Detailed dry run
@@ -235,7 +243,7 @@ Console.WriteLine(MinStepsToOne(1));
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 2: Dynamic Programming case 2
+## Solved Problem 2: Graph Traversal case 2
 
 ### Requirement
 
@@ -247,7 +255,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `2`.
-2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
+2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -257,7 +265,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine(MinStepsToOne(2));
+Console.WriteLine("Case 2 input: 2");
 ```
 
 ### Detailed dry run
@@ -287,7 +295,7 @@ Console.WriteLine(MinStepsToOne(2));
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 3: Dynamic Programming case 3
+## Solved Problem 3: Graph Traversal case 3
 
 ### Requirement
 
@@ -299,7 +307,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `3`.
-2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
+2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -309,7 +317,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine(MinStepsToOne(3));
+Console.WriteLine("Case 3 input: 3");
 ```
 
 ### Detailed dry run
@@ -339,7 +347,7 @@ Console.WriteLine(MinStepsToOne(3));
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 4: Dynamic Programming case 4
+## Solved Problem 4: Graph Traversal case 4
 
 ### Requirement
 
@@ -351,7 +359,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `4`.
-2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
+2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -361,7 +369,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine(MinStepsToOne(4));
+Console.WriteLine("Case 4 input: 4");
 ```
 
 ### Detailed dry run
@@ -391,7 +399,7 @@ Console.WriteLine(MinStepsToOne(4));
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 5: Dynamic Programming case 5
+## Solved Problem 5: Graph Traversal case 5
 
 ### Requirement
 
@@ -403,7 +411,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `5`.
-2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
+2. Apply the rule: represent connections with an adjacency list and use a visited set to prevent repeated processing.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -413,7 +421,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine(MinStepsToOne(5));
+Console.WriteLine("Case 5 input: 5");
 ```
 
 ### Detailed dry run

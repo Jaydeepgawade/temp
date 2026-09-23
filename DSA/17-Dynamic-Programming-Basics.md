@@ -1,147 +1,128 @@
-# 11 - Greedy Algorithm Basics
+# 17 - Dynamic Programming Basics
 
-## What is a Greedy Algorithm?
-A Greedy Algorithm chooses the **best option available right now** at every step.
-
-It does not usually go back and change the previous decision.
-
-Simple idea:
-```text
-Choose the best local option -> move forward -> repeat
-```
-
-## Where Greedy is useful
-Common examples:
-- Activity Selection
-- Coin Change for some coin systems
-- Minimum/Maximum selection problems
-- Kruskal's Algorithm
-- Prim's Algorithm
-- Huffman Coding
-
-## Beginner Example - Activity Selection
-Suppose we have activities with start and end times.
-We want to select the maximum number of non-overlapping activities.
+## Preserved code from the original lesson
 
 ```text
-Activity  Start  End
-A1        1      2
-A2        3      4
-A3        0      6
-A4        5      7
-A5        8      9
-A6        5      9
+Calculate once -> store the result -> reuse it
 ```
-
-Greedy idea:
-Choose the activity that finishes earliest.
-
-## C# Example
+```text
+fib(5)
+ -> fib(4)
+ -> fib(3)
+ -> fib(3)
+ -> fib(2)
+```
 ```csharp
 using System;
 using System.Collections.Generic;
-using System.Linq;
-
-class Activity
-{
-    public string Name { get; set; }
-    public int Start { get; set; }
-    public int End { get; set; }
-}
 
 class Program
 {
+    static Dictionary<int, int> memo = new Dictionary<int, int>();
+
+    static int Fibonacci(int n)
+    {
+        if (n <= 1)
+        {
+            return n;
+        }
+
+        if (memo.ContainsKey(n))
+        {
+            return memo[n];
+        }
+
+        int result = Fibonacci(n - 1) + Fibonacci(n - 2);
+        memo[n] = result;
+
+        return result;
+    }
+
     static void Main()
     {
-        List<Activity> activities = new List<Activity>
-        {
-            new Activity { Name = "A1", Start = 1, End = 2 },
-            new Activity { Name = "A2", Start = 3, End = 4 },
-            new Activity { Name = "A3", Start = 0, End = 6 },
-            new Activity { Name = "A4", Start = 5, End = 7 },
-            new Activity { Name = "A5", Start = 8, End = 9 },
-            new Activity { Name = "A6", Start = 5, End = 9 }
-        };
-
-        activities = activities.OrderBy(x => x.End).ToList();
-
-        int lastEndTime = -1;
-
-        foreach (Activity activity in activities)
-        {
-            if (activity.Start >= lastEndTime)
-            {
-                Console.WriteLine(activity.Name);
-                lastEndTime = activity.End;
-            }
-        }
+        Console.WriteLine(Fibonacci(6));
     }
 }
 ```
-
-## Coin Change Basic Example
-Suppose coins are:
 ```text
-10, 5, 2, 1
+8
 ```
-Amount:
-```text
-18
-```
-
-Greedy choice:
-```text
-10 + 5 + 2 + 1 = 18
-```
-
-## C# Code
 ```csharp
 using System;
 
 class Program
 {
+    static int Fibonacci(int n)
+    {
+        if (n <= 1)
+        {
+            return n;
+        }
+
+        int[] dp = new int[n + 1];
+        dp[0] = 0;
+        dp[1] = 1;
+
+        for (int i = 2; i <= n; i++)
+        {
+            dp[i] = dp[i - 1] + dp[i - 2];
+        }
+
+        return dp[n];
+    }
+
     static void Main()
     {
-        int amount = 18;
-        int[] coins = { 10, 5, 2, 1 };
-
-        foreach (int coin in coins)
-        {
-            while (amount >= coin)
-            {
-                Console.Write(coin + " ");
-                amount = amount - coin;
-            }
-        }
+        Console.WriteLine(Fibonacci(6));
     }
 }
 ```
-
-Output:
 ```text
-10 5 2 1
+Index : 0 1 2 3 4 5 6
+Value : 0 1 1 2 3 5 8
 ```
+```text
+ways[n] = ways[n - 1] + ways[n - 2]
+```
+```csharp
+using System;
 
-## Important Note
-Greedy does **not** give the correct answer for every problem.
-It works only when the problem has a valid greedy property.
+class Program
+{
+    static int ClimbStairs(int n)
+    {
+        if (n <= 2)
+        {
+            return n;
+        }
 
-## Time Complexity
-It depends on the problem.
-For Activity Selection, sorting usually takes:
-- Time Complexity: **O(n log n)**
+        int[] dp = new int[n + 1];
+        dp[1] = 1;
+        dp[2] = 2;
 
-## Practice
-1. Select maximum non-overlapping activities.
-2. Solve coin change using greedy.
-3. Find minimum number of notes for an amount.
-4. Find maximum value by repeatedly choosing the largest available value.
+        for (int i = 3; i <= n; i++)
+        {
+            dp[i] = dp[i - 1] + dp[i - 2];
+        }
+
+        return dp[n];
+    }
+
+    static void Main()
+    {
+        Console.WriteLine(ClimbStairs(5));
+    }
+}
+```
+```text
+8
+```
 
 # Detailed English Workbook
 
 ## Learning contract
 
-This workbook develops a complete understanding of **Greedy Algorithms**.
+This workbook develops a complete understanding of **Dynamic Programming**.
 It keeps the earlier lesson and code available above.
 The added material uses English only.
 Every solved problem includes a requirement, reasoning, C# solution, and dry run.
@@ -150,7 +131,7 @@ On revision days, start with the problems and return to theory when necessary.
 
 ## Mental model
 
-The central idea is to make the best valid local choice, record it, and continue without undoing earlier choices.
+The central idea is to define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
 An algorithm is a precise sequence of finite steps.
 Each variable must have one clear responsibility.
 The input is the value supplied by the caller.
@@ -176,18 +157,16 @@ Keeping these roles separate makes debugging much easier.
 ## Reference implementation
 
 ```csharp
-static int SelectActivities(List<(int Start, int End)> activities)
+static int MinStepsToOne(int number)
 {
-    activities.Sort((a, b) => a.End.CompareTo(b.End));
-    int count = 0;
-    int lastEnd = int.MinValue;
-    foreach (var activity in activities)
+    int[] dp = new int[number + 1];
+    for (int value = 2; value <= number; value++)
     {
-        if (activity.Start < lastEnd) continue;
-        count++;
-        lastEnd = activity.End;
+        dp[value] = dp[value - 1] + 1;
+        if (value % 2 == 0) dp[value] = Math.Min(dp[value], dp[value / 2] + 1);
+        if (value % 3 == 0) dp[value] = Math.Min(dp[value], dp[value / 3] + 1);
     }
-    return count;
+    return dp[number];
 }
 ```
 
@@ -204,7 +183,7 @@ static int SelectActivities(List<(int Start, int End)> activities)
 - This separation lets a console app, API, or test call the same logic.
 - The implementation favors readability before micro-optimization.
 
-## Solved Problem 1: Greedy Algorithms case 1
+## Solved Problem 1: Dynamic Programming case 1
 
 ### Requirement
 
@@ -216,7 +195,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `1`.
-2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
+2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -226,7 +205,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine("Case 1 input: 1");
+Console.WriteLine(MinStepsToOne(1));
 ```
 
 ### Detailed dry run
@@ -256,7 +235,7 @@ Console.WriteLine("Case 1 input: 1");
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 2: Greedy Algorithms case 2
+## Solved Problem 2: Dynamic Programming case 2
 
 ### Requirement
 
@@ -268,7 +247,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `2`.
-2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
+2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -278,7 +257,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine("Case 2 input: 2");
+Console.WriteLine(MinStepsToOne(2));
 ```
 
 ### Detailed dry run
@@ -308,7 +287,7 @@ Console.WriteLine("Case 2 input: 2");
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 3: Greedy Algorithms case 3
+## Solved Problem 3: Dynamic Programming case 3
 
 ### Requirement
 
@@ -320,7 +299,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `3`.
-2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
+2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -330,7 +309,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine("Case 3 input: 3");
+Console.WriteLine(MinStepsToOne(3));
 ```
 
 ### Detailed dry run
@@ -360,7 +339,7 @@ Console.WriteLine("Case 3 input: 3");
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 4: Greedy Algorithms case 4
+## Solved Problem 4: Dynamic Programming case 4
 
 ### Requirement
 
@@ -372,7 +351,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `4`.
-2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
+2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -382,7 +361,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine("Case 4 input: 4");
+Console.WriteLine(MinStepsToOne(4));
 ```
 
 ### Detailed dry run
@@ -412,7 +391,7 @@ Console.WriteLine("Case 4 input: 4");
 - Can the method be unit tested? Yes.
 - Is the existing chapter code preserved? Yes.
 
-## Solved Problem 5: Greedy Algorithms case 5
+## Solved Problem 5: Dynamic Programming case 5
 
 ### Requirement
 
@@ -424,7 +403,7 @@ Keep the algorithm in a separate method so it can be tested.
 ### Reasoning
 
 1. Begin with the input `5`.
-2. Apply the rule: make the best valid local choice, record it, and continue without undoing earlier choices.
+2. Apply the rule: define reusable states, store earlier answers, and build the requested answer without repeating subproblems.
 3. Record state after every meaningful update.
 4. Continue only while unprocessed work remains.
 5. Verify the result against the definition, not merely the program output.
@@ -434,7 +413,7 @@ Keep the algorithm in a separate method so it can be tested.
 Use the reference implementation above with this call:
 
 ```csharp
-Console.WriteLine("Case 5 input: 5");
+Console.WriteLine(MinStepsToOne(5));
 ```
 
 ### Detailed dry run
